@@ -14,6 +14,15 @@ This is a {{ site.pmd.release_type }} release.
 
 ### New and noteworthy
 
+#### Renamed rules
+
+* The Java rule {% rule java/errorprone/BeanMembersShouldSerialize %} has been renamed to
+  {% rule java/errorprone/NonSerializableClass %}. It has been revamped to only check for classes that are marked with
+  `Serializable` and reports each field in it, that is not serializable.
+
+  The property `prefix` has been deprecated, since in a serializable class all fields have to be
+  serializable regardless of the name.
+
 #### Modified rules
 
 * The rule {% rule java/codestyle/ClassNamingConventions %} has a new property `testClassPattern`, which is applied
@@ -22,6 +31,8 @@ This is a {{ site.pmd.release_type }} release.
   JUnit4/5 or TestNG.
 
 ### Fixed Issues
+* cli
+    * [#4215](https://github.com/pmd/pmd/discussions/4215): NullPointerException when trying to open designer
 * java
     * [#3643](https://github.com/pmd/pmd/issues/3643): \[java] More parser edge cases
     * [#4152](https://github.com/pmd/pmd/issues/4152): \[java] Parse error on array type annotations
@@ -30,6 +41,10 @@ This is a {{ site.pmd.release_type }} release.
     * [#4201](https://github.com/pmd/pmd/issues/4201): \[java] CommentDefaultAccessModifier should consider lombok's @<!-- -->Value
 * java-design
     * [#4200](https://github.com/pmd/pmd/issues/4200): \[java] ClassWithOnlyPrivateConstructorsShouldBeFinal should consider lombok's @<!-- -->Value
+* java-errorprone
+    * [#1668](https://github.com/pmd/pmd/issues/1668): \[java] BeanMembersShouldSerialize is extremely noisy
+    * [#4176](https://github.com/pmd/pmd/issues/4176): \[java] Rename BeanMembersShouldSerialize to NonSerializableClass
+    * [#4185](https://github.com/pmd/pmd/issues/4185): \[java] InvalidLogMessageFormat rule produces a NPE
 
 ### API Changes
 
