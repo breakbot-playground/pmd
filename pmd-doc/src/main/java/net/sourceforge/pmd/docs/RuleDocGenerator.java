@@ -37,12 +37,13 @@ import net.sourceforge.pmd.Rule;
 import net.sourceforge.pmd.RuleSet;
 import net.sourceforge.pmd.RuleSetLoadException;
 import net.sourceforge.pmd.RuleSetLoader;
+import net.sourceforge.pmd.internal.util.IOUtil;
 import net.sourceforge.pmd.lang.Language;
+import net.sourceforge.pmd.lang.LanguageRegistry;
 import net.sourceforge.pmd.lang.rule.RuleReference;
 import net.sourceforge.pmd.lang.rule.XPathRule;
 import net.sourceforge.pmd.properties.MultiValuePropertyDescriptor;
 import net.sourceforge.pmd.properties.PropertyDescriptor;
-import net.sourceforge.pmd.util.IOUtil;
 
 public class RuleDocGenerator {
     private static final Logger LOG = LoggerFactory.getLogger(RuleDocGenerator.class);
@@ -99,7 +100,14 @@ public class RuleDocGenerator {
         generateLanguageIndex(sortedRulesets, sortedAdditionalRulesets);
         generateRuleSetIndex(sortedRulesets);
 
+        ensureAllLanguages(sortedRulesets);
         generateSidebar(sortedRulesets);
+    }
+
+    private void ensureAllLanguages(Map<Language, List<RuleSet>> sortedRulesets) {
+        for (Language language : LanguageRegistry.PMD.getLanguages()) {
+            sortedRulesets.putIfAbsent(language, Collections.emptyList());
+        }
     }
 
     private void generateSidebar(Map<Language, List<RuleSet>> sortedRulesets) throws IOException {
@@ -546,7 +554,7 @@ public class RuleDocGenerator {
 
         int indentation = 0;
         int strLen = stripped.length();
-        while (Character.isWhitespace(stripped.charAt(indentation)) && indentation < strLen) {
+        while (indentation < strLen && Character.isWhitespace(stripped.charAt(indentation))) {
             indentation++;
         }
 

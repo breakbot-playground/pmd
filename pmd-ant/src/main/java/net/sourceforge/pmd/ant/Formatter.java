@@ -27,12 +27,12 @@ import org.apache.tools.ant.types.Parameter;
 
 import net.sourceforge.pmd.Report;
 import net.sourceforge.pmd.annotation.InternalApi;
+import net.sourceforge.pmd.internal.util.IOUtil;
 import net.sourceforge.pmd.lang.document.TextFile;
 import net.sourceforge.pmd.renderers.Renderer;
 import net.sourceforge.pmd.renderers.RendererFactory;
 import net.sourceforge.pmd.reporting.FileAnalysisListener;
 import net.sourceforge.pmd.reporting.GlobalAnalysisListener;
-import net.sourceforge.pmd.util.IOUtil;
 
 @InternalApi
 public class Formatter {
@@ -147,7 +147,7 @@ public class Formatter {
     }
 
     private static String[] validRendererCodes() {
-        return RendererFactory.REPORT_FORMAT_TO_RENDERER.keySet().toArray(new String[0]);
+        return RendererFactory.supportedRenderers().toArray(new String[0]);
     }
 
     private static String unknownRendererMessage(String userSpecifiedType) {

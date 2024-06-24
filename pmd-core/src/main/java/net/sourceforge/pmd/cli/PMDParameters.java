@@ -4,10 +4,14 @@
 
 package net.sourceforge.pmd.cli;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.checkerframework.checker.nullness.qual.NonNull;
@@ -34,6 +38,7 @@ import com.beust.jcommander.validators.PositiveInteger;
 @InternalApi
 public class PMDParameters {
 
+    static final String RELATIVIZE_PATHS_WITH = "--relativize-paths-with";
     @Parameter(names = { "--rulesets", "-rulesets", "-R" },
                description = "Path to a ruleset xml file. "
                              + "The path may reference a resource on the classpath of the application, be a local file system path, or a URL. "
@@ -98,9 +103,6 @@ public class PMDParameters {
     @Parameter(names = { "--stress", "-stress", "-S" }, description = "Performs a stress test.")
     private boolean stress = false;
 
-    @Parameter(names = { "--short-names", "-shortnames" }, description = "Prints shortened filenames in the report.")
-    private boolean shortnames = false;
-
     @Parameter(names = { "--show-suppressed", "-showsuppressed" }, description = "Report should show suppressed rule violations.")
     private boolean showsuppressed = false;
 
@@ -123,6 +125,17 @@ public class PMDParameters {
                    + "The file is created if it does not exist. "
                    + "If this option is not specified, the report is rendered to standard output.")
     private String reportfile = null;
+
+    @Parameter(names = { RELATIVIZE_PATHS_WITH, "-z" },
+               variableArity = true,
+               description = "Path relative to which directories are rendered in the report. "
+                             + "This option allows shortening directories in the report; "
+                             + "without it, paths are rendered as mentioned in the source directory (option \"--dir\"). "
+                             + "The option can be repeated, in which case the shortest relative path will be used. "
+                             + "If the root path is mentioned (e.g. \"/\" or \"C:\\\"), then the paths will be rendered as absolute.",
+               validateValueWith = PathToRelativizeRootValidator.class,
+               converter = StringToPathConverter.class)
+    private List<Path> relativizePathRoot = new ArrayList<>();
 
     @Parameter(names = { "-version", "-v" }, description = "Specify version of a language PMD should use.")
     private String version = null;
@@ -167,9 +180,6 @@ public class PMDParameters {
     @Parameter(names = { "--no-cache", "-no-cache" }, description = "Explicitly disable incremental analysis. The '-cache' option is ignored if this switch is present in the command line.")
     private boolean noCache = false;
 
-    @Parameter(names = { "--no-progress", "-no-progress" }, description = "Disables progress bar indicator of live analysis progress.")
-    private boolean noProgressBar = false;
-
     @Parameter(names = "--use-version", description = "The language version PMD should use when parsing source code in the language-version format, ie: 'java-1.8'")
     private List<String> languageVersions = new ArrayList<>();
 
@@ -205,25 +215,23 @@ public class PMDParameters {
         }
     }
 
-    /** @deprecated Will be removed in 7.0.0 */
-    @Deprecated
-    public static class RulePriorityConverter implements IStringConverter<RulePriority> {
-
-        public int validate(String value) throws ParameterException {
-            int minPriorityValue = Integer.parseInt(value);
-            if (minPriorityValue < 1 || minPriorityValue > 5) {
-                throw new ParameterException(
-                        "Priority values can only be integer value, between 1 and 5," + value + " is not valid");
-            }
-            return minPriorityValue;
-        }
-
+    public static class PathToRelativizeRootValidator implements IValueValidator<List<Path>> {
         @Override
-        public RulePriority convert(String value) {
-            return RulePriority.valueOf(validate(value));
+        public void validate(String name, List<Path> value) throws ParameterException {
+            for (Path p : value) {
+                if (Files.isRegularFile(p)) {
+                    throw new ParameterException("Expected a directory path for option " + name + ", found a file: " + p);
+                }
+            }
         }
     }
 
+    public static class StringToPathConverter implements IStringConverter<Path> {
+        @Override
+        public Path convert(String value) {
+            return Paths.get(value);
+        }
+    }
 
     /**
      * Converts these parameters into a configuration.
@@ -250,17 +258,17 @@ public class PMDParameters {
                     "Please provide a parameter for source root directory (-dir or -d), database URI (-uri or -u), or file list path (-filelist).");
         }
         PMDConfiguration configuration = new PMDConfiguration();
-        configuration.setInputPaths(this.getInputPaths());
+        configuration.setInputPaths(this.getInputPaths().stream().collect(Collectors.joining(",")));
         configuration.setInputFilePath(this.getFileListPath());
         configuration.setIgnoreFilePath(this.getIgnoreListPath());
         configuration.setInputUri(this.getUri());
         configuration.setReportFormat(this.getFormat());
         configuration.setBenchmark(this.isBenchmark());
         configuration.setDebug(this.isDebug());
+        configuration.addRelativizeRoots(this.relativizePathRoot);
         configuration.setMinimumPriority(this.getMinimumPriority());
         configuration.setReportFile(this.getReportfile());
         configuration.setReportProperties(this.getProperties());
-        configuration.setReportShortNames(this.isShortnames());
         configuration.setRuleSets(Arrays.asList(this.getRulesets().split(",")));
         configuration.setRuleSetFactoryCompatibilityEnabled(!this.noRuleSetCompatibility);
         configuration.setShowSuppressedViolations(this.isShowsuppressed());
@@ -271,7 +279,6 @@ public class PMDParameters {
         configuration.setFailOnViolation(this.isFailOnViolation());
         configuration.setAnalysisCacheLocation(this.cacheLocation);
         configuration.setIgnoreIncrementalAnalysis(this.isIgnoreIncrementalAnalysis());
-        configuration.setProgressBar(this.isProgressBar());
 
         LanguageVersion forceLangVersion = getForceLangVersion(registry);
         if (forceLangVersion != null) {
@@ -343,10 +350,6 @@ public class PMDParameters {
         return stress;
     }
 
-    public boolean isShortnames() {
-        return shortnames;
-    }
-
     public boolean isShowsuppressed() {
         return showsuppressed;
     }
@@ -381,7 +384,7 @@ public class PMDParameters {
         }
         return null;
     }
-    
+
     public @Nullable String getLanguage() {
         return language;
     }
@@ -435,10 +438,6 @@ public class PMDParameters {
 
     public boolean isFailOnViolation() {
         return failOnViolation;
-    }
-
-    public boolean isProgressBar() {
-        return !noProgressBar;
     }
 
 

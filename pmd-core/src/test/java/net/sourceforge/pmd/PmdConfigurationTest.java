@@ -22,7 +22,9 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 
 import org.junit.jupiter.api.Test;
@@ -30,9 +32,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 import net.sourceforge.pmd.cache.FileAnalysisCache;
 import net.sourceforge.pmd.cache.NoopAnalysisCache;
+import net.sourceforge.pmd.internal.util.ClasspathClassLoader;
 import net.sourceforge.pmd.renderers.CSVRenderer;
 import net.sourceforge.pmd.renderers.Renderer;
-import net.sourceforge.pmd.util.ClasspathClassLoader;
 
 class PmdConfigurationTest {
 
@@ -157,17 +159,12 @@ class PmdConfigurationTest {
     @Test
     void testInputPaths() {
         PMDConfiguration configuration = new PMDConfiguration();
-        assertEquals(null, configuration.getInputPaths(), "Default input paths");
+        assertThat(configuration.getInputPathList(), empty());
         configuration.setInputPaths("a,b,c");
-        assertEquals("a,b,c", configuration.getInputPaths(), "Changed input paths");
-    }
-
-    @Test
-    void testReportShortNames() {
-        PMDConfiguration configuration = new PMDConfiguration();
-        assertEquals(false, configuration.isReportShortNames(), "Default report short names");
-        configuration.setReportShortNames(true);
-        assertEquals(true, configuration.isReportShortNames(), "Changed report short names");
+        List<Path> expected = listOf(
+            Paths.get("a"), Paths.get("b"), Paths.get("c")
+        );
+        assertEquals(expected, configuration.getInputPathList(), "Changed input paths");
     }
 
     @Test

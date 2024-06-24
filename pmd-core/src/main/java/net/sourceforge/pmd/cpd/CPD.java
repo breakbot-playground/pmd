@@ -7,7 +7,9 @@ package net.sourceforge.pmd.cpd;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,21 +21,18 @@ import java.util.TreeMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
 import net.sourceforge.pmd.annotation.Experimental;
-import net.sourceforge.pmd.cli.internal.CliMessages;
-import net.sourceforge.pmd.cpd.renderer.CPDReportRenderer;
-import net.sourceforge.pmd.internal.Slf4jSimpleConfiguration;
+import net.sourceforge.pmd.internal.util.FileFinder;
+import net.sourceforge.pmd.internal.util.FileUtil;
+import net.sourceforge.pmd.internal.util.IOUtil;
 import net.sourceforge.pmd.lang.ast.TokenMgrError;
-import net.sourceforge.pmd.util.FileFinder;
-import net.sourceforge.pmd.util.IOUtil;
 import net.sourceforge.pmd.util.database.DBMSMetadata;
 import net.sourceforge.pmd.util.database.DBURI;
 import net.sourceforge.pmd.util.database.SourceObject;
 
 /**
- * @deprecated This class is to be removed in PMD 7 in favor of a unified PmdCli entry point.
+ * @deprecated Use the module pmd-cli for CLI support.
  */
 @Deprecated
 public class CPD {
@@ -55,6 +54,73 @@ public class CPD {
         // before we start any tokenizing (add(File...)), we need to reset the
         // static TokenEntry status
         TokenEntry.clearImages();
+
+        // Add all sources
+        extractAllSources();
+    }
+
+    private void extractAllSources() {
+        // Add files
+        if (null != configuration.getFiles() && !configuration.getFiles().isEmpty()) {
+            addSourcesFilesToCPD(configuration.getFiles());
+        }
+
+        // Add Database URIS
+        if (null != configuration.getURI() && !"".equals(configuration.getURI())) {
+            addSourceURIToCPD(configuration.getURI());
+        }
+
+        if (null != configuration.getFileListPath() && !"".equals(configuration.getFileListPath())) {
+            addFilesFromFilelist(configuration.getFileListPath());
+        }
+    }
+
+    private void addSourcesFilesToCPD(List<File> files) {
+        try {
+            for (File file : files) {
+                if (!file.exists()) {
+                    throw new FileNotFoundException("Could not find directory/file '" + file + "'");
+                } else if (file.isDirectory()) {
+                    if (configuration.isNonRecursive()) {
+                        addAllInDirectory(file);
+                    } else {
+                        addRecursively(file);
+                    }
+                } else {
+                    add(file);
+                }
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private void addFilesFromFilelist(String inputFilePath) {
+        List<File> files = new ArrayList<>();
+        try {
+            Path file = FileUtil.toExistingPath(inputFilePath);
+            for (Path fileToAdd : FileUtil.readFilelistEntries(file)) {
+                if (!Files.exists(fileToAdd)) {
+                    throw new RuntimeException("No such file " + fileToAdd);
+                }
+                files.add(fileToAdd.toFile());
+            }
+            addSourcesFilesToCPD(files);
+        } catch (IOException ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    private void addSourceURIToCPD(String uri) {
+        try {
+            log.debug("Attempting DBURI={}", uri);
+            DBURI dburi = new DBURI(uri);
+            log.debug("Initialised DBURI={}", dburi);
+            log.debug("Adding DBURI={} with DBType={}", dburi, dburi.getDbType());
+            add(dburi);
+        } catch (IOException | URISyntaxException e) {
+            throw new IllegalStateException("uri=" + uri, e);
+        }
     }
 
     public void setCpdListener(CPDListener cpdListener) {
@@ -68,6 +134,10 @@ public class CPD {
         log.debug("Finished: {} duplicates found", matchAlgorithm.getMatches().size());
     }
 
+    /**
+     * @deprecated Use {@link #toReport()}.
+     */
+    @Deprecated
     public Iterator<Match> getMatches() {
         return matchAlgorithm.matches();
     }
@@ -123,7 +193,7 @@ public class CPD {
         add(sourceCode);
     }
 
-    public void add(DBURI dburi) throws IOException {
+    public void add(DBURI dburi) {
 
         try {
             DBMSMetadata dbmsmetadata = new DBMSMetadata(dburi);
@@ -197,98 +267,16 @@ public class CPD {
      * invoke {@link System#exit(int)}.
      *
      * @param args command line arguments
+     *
+     * @deprecated Use module pmd-cli -- to be removed before 7.0.0 is out.
      */
+    @Deprecated
     public static void main(String[] args) {
-        StatusCode statusCode = runCpd(args);
-        CPDCommandLineInterface.setStatusCodeOrExit(statusCode.toInt());
-    }
-
-    /**
-     * Parses the command line and executes CPD. Returns the status code
-     * without exiting the VM.
-     *
-     * @param args command line arguments
-     *
-     * @return the status code
-     */
-    public static StatusCode runCpd(String... args) {
-        CPDConfiguration arguments = new CPDConfiguration();
-        CPD.StatusCode statusCode = CPDCommandLineInterface.parseArgs(arguments, args);
-        if (statusCode != null) {
-            return statusCode;
-        }
-
-        // only reconfigure logging, if debug flag was used on command line
-        // otherwise just use whatever is in conf/simplelogger.properties which happens automatically
-        if (arguments.isDebug()) {
-            Slf4jSimpleConfiguration.reconfigureDefaultLogLevel(Level.TRACE);
-        }
-        // always need to reload the logger with the new/changed configuration
-        // unit tests might reset the logging configuration
-        log = LoggerFactory.getLogger(CPD.class);
-
-        // TODO CLI errors should also be reported through this
-        // TODO this should not use the logger as backend, otherwise without
-        //  slf4j implementation binding, errors are entirely ignored.
-        // always install java.util.logging to slf4j bridge
-        Slf4jSimpleConfiguration.installJulBridge();
-        // logging, mostly for testing purposes
-        Level defaultLogLevel = Slf4jSimpleConfiguration.getDefaultLogLevel();
-        log.info("Log level is at {}", defaultLogLevel);
-
-        CPD cpd = new CPD(arguments);
-
-        try {
-            CPDCommandLineInterface.addSourceFilesToCPD(cpd, arguments);
-
-            cpd.go();
-            final CPDReportRenderer renderer = arguments.getCPDReportRenderer();
-            if (renderer == null) {
-                // legacy writer
-                System.out.println(arguments.getRenderer().render(cpd.getMatches()));
-            } else {
-                final CPDReport report = cpd.toReport();
-                renderer.render(report, IOUtil.createWriter(Charset.defaultCharset(), null));
-            }
-            if (cpd.getMatches().hasNext()) {
-                if (arguments.isFailOnViolation()) {
-                    statusCode = StatusCode.DUPLICATE_CODE_FOUND;
-                } else {
-                    statusCode = StatusCode.OK;
-                }
-            } else {
-                statusCode = StatusCode.OK;
-            }
-        } catch (IOException | RuntimeException e) {
-            log.debug(e.toString(), e);
-            log.error(CliMessages.errorDetectedMessage(1, CPDCommandLineInterface.PROGRAM_NAME));
-            statusCode = StatusCode.ERROR;
-        }
-        return statusCode;
+        throw new UnsupportedOperationException("Use the pmd-cli module.");
     }
 
     public CPDReport toReport() {
         return new CPDReport(matchAlgorithm.getMatches(), numberOfTokensPerFile);
     }
 
-    /**
-     * @deprecated This class is to be removed in PMD 7 in favor of a unified PmdCli entry point.
-     */
-    @Deprecated
-    public enum StatusCode {
-        OK(0),
-        ERROR(1),
-        DUPLICATE_CODE_FOUND(4);
-
-        private final int code;
-
-        StatusCode(int code) {
-            this.code = code;
-        }
-
-        /** Returns the exit code as used in CLI. */
-        public int toInt() {
-            return this.code;
-        }
-    }
 }

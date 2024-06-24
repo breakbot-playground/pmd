@@ -4,7 +4,7 @@
 
 package net.sourceforge.pmd.lang.vf.ast;
 
-import static org.junit.Assert.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -13,13 +13,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
+import net.sourceforge.pmd.lang.LanguageProcessorRegistry;
 import net.sourceforge.pmd.lang.vf.DataType;
 import net.sourceforge.pmd.lang.vf.VFTestUtils;
-import net.sourceforge.pmd.lang.vf.VfHandler;
+import net.sourceforge.pmd.lang.vf.VfLanguageProperties;
 
-public class ApexClassPropertyTypesTest {
+class ApexClassPropertyTypesTest {
     private static final Map<String, DataType> EXPECTED_DATA_TYPES;
 
     static {
@@ -52,23 +53,27 @@ public class ApexClassPropertyTypesTest {
     }
 
     @Test
-    public void testApexClassIsProperlyParsed() {
+    void testApexClassIsProperlyParsed() {
         Path vfPagePath = VFTestUtils.getMetadataPath(this, VFTestUtils.MetadataFormat.SFDX, VFTestUtils.MetadataType.Vf)
                                      .resolve("SomePage.page");
-        ApexClassPropertyTypes apexClassPropertyTypes = new ApexClassPropertyTypes();
+        try (LanguageProcessorRegistry lpReg = VFTestUtils.fakeLpRegistry()) {
+            ApexClassPropertyTypes apexClassPropertyTypes = new ApexClassPropertyTypes(lpReg);
+            ObjectFieldTypesTest.validateDataTypes(EXPECTED_DATA_TYPES, apexClassPropertyTypes, vfPagePath,
+                                                   VfLanguageProperties.APEX_DIRECTORIES_DESCRIPTOR.defaultValue());
+        }
 
-        ObjectFieldTypesTest.validateDataTypes(EXPECTED_DATA_TYPES, apexClassPropertyTypes, vfPagePath,
-                                               VfHandler.APEX_DIRECTORIES_DESCRIPTOR.defaultValue());
     }
 
     @Test
-    public void testInvalidDirectoryDoesNotCauseAnException() {
+    void testInvalidDirectoryDoesNotCauseAnException() {
         Path vfPagePath = VFTestUtils.getMetadataPath(this, VFTestUtils.MetadataFormat.SFDX, VFTestUtils.MetadataType.Vf)
                 .resolve("SomePage.page");
         String vfFileName = vfPagePath.toString();
 
         List<String> paths = Arrays.asList(Paths.get("..", "classes-does-not-exist").toString());
-        ApexClassPropertyTypes apexClassPropertyTypes = new ApexClassPropertyTypes();
-        assertNull(apexClassPropertyTypes.getDataType("ApexController.accOuntIdProp", vfFileName, paths));
+        try (LanguageProcessorRegistry lpReg = VFTestUtils.fakeLpRegistry()) {
+            ApexClassPropertyTypes apexClassPropertyTypes = new ApexClassPropertyTypes(lpReg);
+            assertNull(apexClassPropertyTypes.getDataType("ApexController.accOuntIdProp", vfFileName, paths));
+        }
     }
 }

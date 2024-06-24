@@ -13,28 +13,13 @@ Rules that flag suboptimal code.
           language="java"
           since="4.0"
           message="Do not add empty strings"
-          class="net.sourceforge.pmd.lang.rule.XPathRule"
+          class="net.sourceforge.pmd.lang.java.rule.performance.AddEmptyStringRule"
           externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_performance.html#addemptystring">
         <description>
 The conversion of literals to strings by concatenating them with empty strings is inefficient.
 It is much better to use one of the type-specific `toString()` methods instead or `String.valueOf()`.
         </description>
         <priority>3</priority>
-        <properties>
-            <property name="xpath">
-                <value>
-<![CDATA[
-//InfixExpression[@Operator='+']/StringLiteral[@Empty=true()][not(ancestor::Annotation)]
-|
-//InfixExpression[@Operator='+']/VariableAccess
-  [@Name = (//FieldDeclaration[pmd-java:modifiers() = 'final']|ancestor::MethodDeclaration//LocalVariableDeclaration[pmd-java:modifiers() = 'final'])
-                /VariableDeclarator[@Initializer = true()]
-                    [StringLiteral[@Empty=true()]]
-                    /VariableDeclaratorId/@Name]
-]]>
-                </value>
-            </property>
-        </properties>
         <example>
 <![CDATA[
 String s = "" + 123;                // inefficient
@@ -93,10 +78,31 @@ If you want to copy/move elements inside the _same_ array (e.g. shift the elemen
                                       (: no nested arrays or method calls as array index :)
                                       [count(ArrayAccess[not(.//ArrayAccess)]
                                                         [not(.//MethodCall)])=2]
-                                      (: array index must be same :)
-                                      [distinct-values(ArrayAccess[1]/(VariableAccess[2]|InfixExpression//VariableAccess)/@Name)
-                                       = distinct-values(ArrayAccess[2]/(VariableAccess[2]|InfixExpression//VariableAccess)/@Name)
-                                      ]
+                                      (: array access indexes must be same (excluding constants) :)
+                                      [deep-equal(
+                                        sort(distinct-values(ArrayAccess[1]/(VariableAccess[2]|InfixExpression//VariableAccess)
+                                            (: don't consider array length accesses :)
+                                            [not(parent::FieldAccess[@Name='length'])]
+                                            [
+                                               (: exclude referenced constants :)
+                                               not(@Name = (ancestor::MethodDeclaration|//FieldDeclaration)//VariableDeclarator[NumericLiteral][not(../../../parent::ForInit)]/VariableDeclaratorId/@Name)
+                                               or
+                                               (: include loop variable :)
+                                               @Name = ancestor::ForStatement/ForInit/LocalVariableDeclaration/VariableDeclarator/VariableDeclaratorId/@Name
+                                            ]
+                                            /@Name)),
+                                        sort(distinct-values(ArrayAccess[2]/(VariableAccess[2]|InfixExpression//VariableAccess)
+                                            (: don't consider array length accesses :)
+                                            [not(parent::FieldAccess[@Name='length'])]
+                                            [
+                                               (: exclude referenced constants :)
+                                               not(@Name = (ancestor::MethodDeclaration|//FieldDeclaration)//VariableDeclarator[NumericLiteral][not(../../../parent::ForInit)]/VariableDeclaratorId/@Name)
+                                               or
+                                               (: include loop variable :)
+                                               @Name = ancestor::ForStatement/ForInit/LocalVariableDeclaration/VariableDeclarator/VariableDeclaratorId/@Name
+                                            ]
+                                            /@Name))
+                                      )]
      )=1]
 ]]>
                 </value>

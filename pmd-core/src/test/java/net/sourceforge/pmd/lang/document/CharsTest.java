@@ -16,32 +16,36 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
 import net.sourceforge.pmd.util.CollectionUtil;
+import net.sourceforge.pmd.util.IteratorUtil;
 
 /**
  *
  */
-public class CharsTest {
+class CharsTest {
 
     @Test
-    public void wrapStringRoundTrip() {
+    void wrapStringRoundTrip() {
         String s = "ooo";
         assertSame(s, Chars.wrap(s).toString());
     }
 
     @Test
-    public void wrapCharsRoundTrip() {
+    void wrapCharsRoundTrip() {
         Chars s = Chars.wrap("ooo");
         assertSame(s, Chars.wrap(s));
     }
 
     @Test
-    public void appendChars() {
+    void appendChars() {
         StringBuilder sb = new StringBuilder();
         Chars bc = Chars.wrap("abcd").slice(1, 2);
         assertEquals("bc", bc.toString());
@@ -51,7 +55,7 @@ public class CharsTest {
     }
 
     @Test
-    public void appendCharsWithOffsets() {
+    void appendCharsWithOffsets() {
         StringBuilder sb = new StringBuilder();
         Chars bc = Chars.wrap("abcd").slice(1, 2);
         assertEquals("bc", bc.toString());
@@ -61,7 +65,7 @@ public class CharsTest {
     }
 
     @Test
-    public void toStringBuilder() {
+    void toStringBuilder() {
         Chars bc = Chars.wrap("abcd").slice(1, 2);
         assertEquals("bc", bc.toString());
 
@@ -69,7 +73,7 @@ public class CharsTest {
     }
 
     @Test
-    public void write() throws IOException {
+    void write() throws IOException {
         StringWriter writer = new StringWriter();
         Chars bc = Chars.wrap("abcd").slice(1, 2);
         assertEquals("bc", bc.toString());
@@ -82,7 +86,7 @@ public class CharsTest {
     }
 
     @Test
-    public void getChars() {
+    void getChars() {
         char[] arr = new char[4];
         Chars bc = Chars.wrap("abcd").slice(1, 2);
 
@@ -97,7 +101,7 @@ public class CharsTest {
     }
 
     @Test
-    public void indexOf() {
+    void indexOf() {
         Chars bc = Chars.wrap("aaaaabcdb").slice(5, 2);
         //                          --
         assertEquals(0, bc.indexOf('b', 0));
@@ -111,7 +115,7 @@ public class CharsTest {
     }
 
     @Test
-    public void indexOfString() {
+    void indexOfString() {
         Chars bc = Chars.wrap("aaaaabcdb").slice(5, 2);
         //                          --
         assertEquals(0, bc.indexOf("b", 0));
@@ -136,7 +140,7 @@ public class CharsTest {
     }
 
     @Test
-    public void lastIndexOf() {
+    void lastIndexOf() {
         Chars bc = Chars.wrap("aaaaabcdb").slice(5, 2);
         //                          --
         assertEquals(0, bc.lastIndexOf('b', 0));
@@ -153,7 +157,7 @@ public class CharsTest {
     }
 
     @Test
-    public void startsWith() {
+    void startsWith() {
         Chars bc = Chars.wrap("abcdb").slice(1, 2);
 
         assertTrue(bc.startsWith("bc"));
@@ -179,7 +183,7 @@ public class CharsTest {
     }
 
     @Test
-    public void removeSuffix() {
+    void removeSuffix() {
         Chars bc = Chars.wrap("abcdb").slice(1, 2);
         //                      --
 
@@ -195,7 +199,7 @@ public class CharsTest {
     }
 
     @Test
-    public void removePrefix() {
+    void removePrefix() {
         Chars bc = Chars.wrap("abcdb").slice(1, 2);
         //                      --
 
@@ -213,7 +217,7 @@ public class CharsTest {
     }
 
     @Test
-    public void trimNoop() {
+    void trimNoop() {
         Chars bc = Chars.wrap("abcdb").slice(1, 2);
         assertEquals("bc", bc.toString());
         assertEquals("bc", bc.trimStart().toString());
@@ -222,7 +226,7 @@ public class CharsTest {
     }
 
     @Test
-    public void trimStartAndEnd() {
+    void trimStartAndEnd() {
         Chars bc = Chars.wrap("a   bc db").slice(1, 6);
         //                      ------
         assertEquals("   bc ", bc.toString());
@@ -232,7 +236,7 @@ public class CharsTest {
     }
 
     @Test
-    public void charAt() {
+    void charAt() {
 
         Chars bc = Chars.wrap("a   bc db").slice(1, 6);
         //                      ------
@@ -245,7 +249,7 @@ public class CharsTest {
     }
 
     @Test
-    public void linesTest() {
+    void linesTest() {
 
         Chars bc = Chars.wrap("a \n  \r\nbc db").slice(1, 9);
         //                      ------------
@@ -254,28 +258,28 @@ public class CharsTest {
     }
 
     @Test
-    public void linesTest2() {
+    void linesTest2() {
         Chars bc = Chars.wrap("aa\n");
         List<String> lines = CollectionUtil.map(bc.lines(), Chars::toString);
         assertEquals(listOf("aa"), lines);
     }
 
     @Test
-    public void linesStreamTest() {
+    void linesStreamTest() {
         Chars bc = Chars.wrap("aa\nb\rded\r\nlff");
         List<String> lines = bc.lineStream().map(Chars::toString).collect(Collectors.toList());
         assertEquals(listOf("aa", "b", "ded", "lff"), lines);
     }
 
     @Test
-    public void linesTest3WithCr() {
+    void linesTest3WithCr() {
         Chars bc = Chars.wrap("aa\rb");
         List<String> lines = CollectionUtil.map(bc.lines(), Chars::toString);
         assertEquals(listOf("aa", "b"), lines);
     }
 
     @Test
-    public void testEqualsHashCode() {
+    void testEqualsHashCode() {
 
 
         Chars chars = Chars.wrap("a_a_b_c_s").slice(2, 5);
@@ -292,7 +296,7 @@ public class CharsTest {
     }
 
     @Test
-    public void testContentEquals() {
+    void testContentEquals() {
 
 
         Chars chars = Chars.wrap("a_a_b_c_s").slice(2, 5);
@@ -308,7 +312,40 @@ public class CharsTest {
     }
 
     @Test
-    public void testSlice() {
+    void testSplits() {
+        Chars chars = Chars.wrap("a_a_b_c_s").slice(2, 5);
+        assertEquals("a_b_c", chars.toString());
+
+        testSplits(chars, "_");
+        testSplits(chars, "a");
+        testSplits(chars, "b");
+        testSplits(chars, "c");
+        assertEquals(listOf("", "_b_c"), listSplits(chars, "a"));
+
+        chars = chars.subSequence(1, 5);
+        assertEquals("_b_c", chars.toString());
+
+        assertEquals(listOf("", "b", "c"), listSplits(chars, "_"));
+
+
+        testSplits(Chars.wrap("abc"), "");
+        testSplits(Chars.wrap(""), "");
+    }
+
+    private List<String> listSplits(Chars chars, String regex) {
+        Pattern pattern = Pattern.compile(regex);
+        Iterator<Chars> splits = chars.splits(pattern).iterator();
+        return IteratorUtil.toList(IteratorUtil.map(splits, Chars::toString));
+    }
+
+    private void testSplits(Chars chars, String regex) {
+        List<String> splitList = listSplits(chars, regex);
+        List<String> expected = Arrays.asList(chars.toString().split(regex));
+        assertEquals(expected, splitList, "Split should behave like String#split");
+    }
+
+    @Test
+    void testSlice() {
         // slice is offset + length
         Chars chars = Chars.wrap("a_a_b_c_s").slice(2, 5);
         //                          -----
@@ -318,7 +355,7 @@ public class CharsTest {
     }
 
     @Test
-    public void testSubsequence() {
+    void testSubsequence() {
         // subsequence is start + end
         Chars chars = Chars.wrap("a_a_b_c_s").slice(2, 5);
         //                          -----
@@ -328,7 +365,7 @@ public class CharsTest {
     }
 
     @Test
-    public void testSubstring() {
+    void testSubstring() {
         // substring is start + end
         Chars chars = Chars.wrap("a_a_b_c_s").slice(2, 5);
         //                          -----
@@ -339,7 +376,7 @@ public class CharsTest {
 
 
     @Test
-    public void testTrimBlankLines() {
+    void testTrimBlankLines() {
         assertTrimBlankLinesEquals(" \n \n abc \n \n de \n \n ",
                                    " abc \n \n de ");
         assertTrimBlankLinesEquals("", "");
@@ -352,7 +389,7 @@ public class CharsTest {
 
 
     @Test
-    public void testReaderSingleChars() throws IOException {
+    void testReaderSingleChars() throws IOException {
         Chars bc = Chars.wrap("a \n  \r\nbc db").slice(1, 9);
         //                      ------------
 
@@ -371,7 +408,7 @@ public class CharsTest {
     }
 
     @Test
-    public void testReaderBuffer() throws IOException {
+    void testReaderBuffer() throws IOException {
         Chars bc = Chars.wrap("a \n  \r\nbc db").slice(1, 9);
         //                      ------------
 
@@ -389,7 +426,7 @@ public class CharsTest {
     }
 
     @Test
-    public void testReaderSlicedBuffer() throws IOException {
+    void testReaderSlicedBuffer() throws IOException {
         Chars bc = Chars.wrap("a \n  \r\nbc db").slice(1, 9);
         //                      ------------
 
@@ -408,7 +445,7 @@ public class CharsTest {
     }
 
     @Test
-    public void testReadClosed() throws IOException {
+    void testReadClosed() throws IOException {
         Chars bc = Chars.wrap("a \n  \r\nbc db").slice(1, 9);
         //                      ------------
 
@@ -418,7 +455,7 @@ public class CharsTest {
     }
 
     @Test
-    public void testReaderMark() throws IOException {
+    void testReaderMark() throws IOException {
         Chars bc = Chars.wrap("abcdefghijklmnop").slice(1, 9);
         //                      ------------
 
@@ -448,7 +485,7 @@ public class CharsTest {
     }
 
     @Test
-    public void testReaderMissingMark() throws IOException {
+    void testReaderMissingMark() throws IOException {
         Chars bc = Chars.wrap("abcdefghijklmnop").slice(1, 9);
         //                      ------------
 
@@ -461,7 +498,7 @@ public class CharsTest {
     }
 
     @Test
-    public void testReaderSkip() throws IOException {
+    void testReaderSkip() throws IOException {
         Chars bc = Chars.wrap("abcdefghijklmnop").slice(1, 9);
         //                      ------------
 
@@ -485,7 +522,7 @@ public class CharsTest {
     }
 
     @Test
-    public void testReaderInvalidParams() throws IOException {
+    void testReaderInvalidParams() throws IOException {
         Chars bc = Chars.wrap("abcdefghijklmnop").slice(1, 9);
         //                      ------------
         char[] cbuf = new char[4];

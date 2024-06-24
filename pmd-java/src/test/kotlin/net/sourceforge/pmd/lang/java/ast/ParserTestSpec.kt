@@ -4,28 +4,28 @@
 
 package net.sourceforge.pmd.lang.java.ast
 
-import io.kotest.core.config.configuration
+import io.kotest.core.names.TestName
+import io.kotest.core.source.sourceRef
 import io.kotest.core.spec.DslDrivenSpec
-import io.kotest.core.spec.style.scopes.Lifecycle
+import io.kotest.core.spec.style.scopes.AbstractContainerScope
 import io.kotest.core.spec.style.scopes.RootScope
-import io.kotest.core.spec.style.scopes.RootTestRegistration
-import io.kotest.core.test.createTestName
-import io.kotest.core.test.TestCaseConfig
-import io.kotest.core.test.TestContext
+import io.kotest.core.spec.style.scopes.addContainer
+import io.kotest.core.spec.style.scopes.addTest
+import io.kotest.core.test.NestedTest
+import io.kotest.core.test.TestScope
 import io.kotest.core.test.TestType
 import io.kotest.matchers.Matcher
-import io.kotest.matchers.should as kotlintestShould
 import net.sourceforge.pmd.lang.ast.Node
 import net.sourceforge.pmd.lang.ast.ParseException
 import net.sourceforge.pmd.lang.ast.test.Assertions
+import net.sourceforge.pmd.lang.ast.test.IntelliMarker
 import net.sourceforge.pmd.lang.ast.test.ValuedNodeSpec
-import net.sourceforge.pmd.lang.ast.test.shouldBe
 import net.sourceforge.pmd.lang.ast.test.shouldMatchN
 import net.sourceforge.pmd.lang.java.types.JTypeMirror
 import net.sourceforge.pmd.lang.java.types.TypeDslMixin
 import net.sourceforge.pmd.lang.java.types.TypeDslOf
-import net.sourceforge.pmd.lang.ast.test.IntelliMarker
 import net.sourceforge.pmd.lang.java.types.shouldHaveType
+import io.kotest.matchers.should as kotlintestShould
 
 /**
  * Base class for grammar tests that use the DSL. Tests are layered into
@@ -41,21 +41,15 @@ abstract class ParserTestSpec(body: ParserTestSpec.() -> Unit) : DslDrivenSpec()
         body()
     }
 
-    override fun lifecycle(): Lifecycle = Lifecycle.from(this)
-    override fun defaultConfig(): TestCaseConfig = actualDefaultConfig()
-    override fun defaultTestCaseConfig(): TestCaseConfig? = defaultTestConfig
-    override fun registration(): RootTestRegistration = RootTestRegistration.from(this)
-
-    private fun actualDefaultConfig() =
-            defaultTestConfig ?: defaultTestCaseConfig() ?: configuration.defaultTestConfig
-
-    fun test(name: String, disabled: Boolean = false, test: suspend TestContext.() -> Unit) =
-            registration().addTest(
-                    name = createTestName(name),
-                    xdisabled = disabled,
-                    test = test,
-                    config = actualDefaultConfig()
+    fun test(name: String, disabled: Boolean = false, test: suspend TestScope.() -> Unit) =
+            addTest(
+                testName = TestName(name),
+                disabled = disabled,
+                config = null,
+                type = TestType.Test,
+                test = test
             )
+
 
     /**
      * Defines a group of tests that should be named similarly,
@@ -76,10 +70,11 @@ abstract class ParserTestSpec(body: ParserTestSpec.() -> Unit) : DslDrivenSpec()
     fun parserTestGroup(name: String,
                         disabled: Boolean = false,
                         spec: suspend GroupTestCtx.() -> Unit) =
-            registration().addContainerTest(
-                    name = createTestName(name),
+            addContainer(
+                    testName = TestName(name),
                     test = { GroupTestCtx(this).spec() },
-                    xdisabled = disabled
+                    disabled = disabled,
+                    config = null
             )
 
     /**
@@ -127,17 +122,20 @@ abstract class ParserTestSpec(body: ParserTestSpec.() -> Unit) : DslDrivenSpec()
             }
 
     private suspend fun containedParserTestImpl(
-            context: TestContext,
-            name: String,
-            javaVersion: JavaVersion,
-            assertions: suspend ParserTestCtx.() -> Unit) {
+        testScope: GroupTestCtx.VersionedTestCtx,
+        name: String,
+        javaVersion: JavaVersion,
+        assertions: suspend ParserTestCtx.() -> Unit) {
 
-        context.registerTestCase(
-                name = createTestName(name),
-                test = { ParserTestCtx(javaVersion).apply { setup() }.assertions() },
-                config = actualDefaultConfig(),
-                type = TestType.Test
+        val nested = NestedTest(
+            name = TestName(name),
+            test = { ParserTestCtx(testScope, javaVersion).apply { setup() }.assertions() },
+            config = null,
+            type = TestType.Test,
+            disabled = false,
+            source = sourceRef()
         )
+        testScope.registerTestCase(nested)
     }
 
     /**
@@ -148,36 +146,39 @@ abstract class ParserTestSpec(body: ParserTestSpec.() -> Unit) : DslDrivenSpec()
 
     }
 
-    inner class GroupTestCtx(private val context: TestContext) {
+    inner class GroupTestCtx(testScope: TestScope) : AbstractContainerScope(testScope) {
 
         suspend fun onVersions(javaVersions: List<JavaVersion>, spec: suspend VersionedTestCtx.() -> Unit) {
             javaVersions.forEach { javaVersion ->
 
-                context.registerTestCase(
-                        name = createTestName("Java ${javaVersion.pmdName}"),
-                        test = { VersionedTestCtx(this, javaVersion).apply { setup() }.spec() },
-                        config = actualDefaultConfig(),
-                        type = TestType.Container
+                val nested = NestedTest(
+                    name = TestName("Java ${javaVersion.pmdName}"),
+                    test = { this@GroupTestCtx.VersionedTestCtx(this, javaVersion).apply { setup() }.spec() },
+                    config = null,
+                    type = TestType.Container,
+                    disabled = false,
+                    source = sourceRef()
                 )
+                this.registerTestCase(nested)
             }
         }
 
-        inner class VersionedTestCtx(private val context: TestContext, javaVersion: JavaVersion) : ParserTestCtx(javaVersion) {
+        inner class VersionedTestCtx(testScope: TestScope, javaVersion: JavaVersion) : ParserTestCtx(testScope, javaVersion) {
 
             suspend fun doTest(name: String, assertions: suspend VersionedTestCtx.() -> Unit) {
-                containedParserTestImpl(context, name, javaVersion = javaVersion) {
-                    assertions()
+                containedParserTestImpl(this@VersionedTestCtx, name, javaVersion = javaVersion) {
+                    this@VersionedTestCtx.assertions()
                 }
             }
 
             suspend infix fun String.should(matcher: Assertions<String>) {
-                containedParserTestImpl(context, "'$this'", javaVersion = javaVersion) {
+                containedParserTestImpl(this@VersionedTestCtx, "'$this'", javaVersion = javaVersion) {
                     this@should kotlintestShould matcher
                 }
             }
 
             suspend infix fun String.should(matcher: Matcher<String>) {
-                containedParserTestImpl(context, "'$this'", javaVersion = javaVersion) {
+                containedParserTestImpl(this@VersionedTestCtx, "'$this'", javaVersion = javaVersion) {
                     this@should kotlintestShould matcher
                 }
             }

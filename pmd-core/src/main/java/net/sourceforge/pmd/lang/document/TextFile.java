@@ -13,6 +13,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.stream.Collectors;
 
 import org.checkerframework.checker.nullness.qual.NonNull;
 
@@ -20,11 +21,11 @@ import net.sourceforge.pmd.PMDConfiguration;
 import net.sourceforge.pmd.annotation.DeprecatedUntil700;
 import net.sourceforge.pmd.cpd.SourceCode;
 import net.sourceforge.pmd.internal.util.BaseCloseable;
+import net.sourceforge.pmd.internal.util.IOUtil;
 import net.sourceforge.pmd.lang.LanguageVersion;
 import net.sourceforge.pmd.lang.document.TextFileBuilder.ForCharSeq;
 import net.sourceforge.pmd.lang.document.TextFileBuilder.ForNio;
 import net.sourceforge.pmd.lang.document.TextFileBuilder.ForReader;
-import net.sourceforge.pmd.util.IOUtil;
 import net.sourceforge.pmd.util.datasource.DataSource;
 
 /**
@@ -159,7 +160,9 @@ public interface TextFile extends Closeable {
      * @throws NullPointerException If any parameter is null
      */
     static TextFile forPath(Path path, Charset charset, LanguageVersion languageVersion) {
-        return builderForPath(path, charset, languageVersion).build();
+        return builderForPath(path, charset, languageVersion)
+                .withDisplayName(path.toString())
+                .build();
     }
 
     /**
@@ -193,7 +196,9 @@ public interface TextFile extends Closeable {
      * @throws NullPointerException If any parameter is null
      */
     static TextFile forCharSeq(CharSequence charseq, String pathId, LanguageVersion languageVersion) {
-        return builderForCharSeq(charseq, pathId, languageVersion).build();
+        return builderForCharSeq(charseq, pathId, languageVersion)
+                .withDisplayName(pathId)
+                .build();
     }
 
     /**
@@ -225,7 +230,9 @@ public interface TextFile extends Closeable {
      * @throws NullPointerException If any parameter is null
      */
     static TextFile forReader(Reader reader, String pathId, LanguageVersion languageVersion) {
-        return builderForReader(reader, pathId, languageVersion).build();
+        return builderForReader(reader, pathId, languageVersion)
+                .withDisplayName(pathId)
+                .build();
     }
 
     /**
@@ -261,6 +268,7 @@ public interface TextFile extends Closeable {
         if (languageVersion == null) {
             throw new NullPointerException("no language version detected for " + pathId);
         }
+        String shortPaths = config.getInputPathList().stream().map(Path::toString).collect(Collectors.joining(","));
         class DataSourceTextFile extends BaseCloseable implements TextFile {
 
             @Override
@@ -275,7 +283,7 @@ public interface TextFile extends Closeable {
 
             @Override
             public @NonNull String getDisplayName() {
-                return ds.getNiceFileName(config.isReportShortNames(), config.getInputPaths());
+                return ds.getNiceFileName(false, shortPaths);
             }
 
             @Override

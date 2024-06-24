@@ -19,14 +19,70 @@ This is a {{ site.pmd.release_type }} release.
 
 ### New and noteworthy
 
-#### CLI improvements
+#### Revamped Command Line Interface
 
-The PMD CLI has been enhanced with a progress bar, which interactively displays the
+PMD now ships with a unified Command Line Interface for both Linux/Unix and Windows. Instead of having a collection of scripts 
+for the different utilities shipped with PMD, a single script `pmd` (`pmd.bat` for Windows) can now launch all
+utilities using subcommands, e.g. `pmd check`, `pmd designer`. All commands and options are thoroughly documented in the help,
+with full color support where available. Moreover, efforts were made to provide consistency in the usage of all PMD utilities.
+
+```shell
+$ Usage: pmd [-hV] [COMMAND]
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
+Commands:
+  check     The PMD standard source code analyzer
+  cpd       Copy/Paste Detector - find duplicate code
+  designer  The PMD visual rule designer
+  cpd-gui   GUI for the Copy/Paste Detector
+              Warning: May not support the full CPD feature set
+  ast-dump  Experimental: dumps the AST of parsing source code
+Exit Codes:
+  0   Succesful analysis, no violations found
+  1   An unexpected error occurred during execution
+  2   Usage error, please refer to the command help
+  4   Successful analysis, at least 1 violation found
+```
+
+For instance, where you previously would have run
+```shell
+run.sh pmd -d src -R ruleset.xml
+```
+you should now use
+```shell
+pmd check -d src -R ruleset.xml
+```
+or even better, omit using `-d` / `--dir` and simply pass the sources at the end of the parameter list
+
+```shell
+pmd check -R ruleset.xml src
+```
+
+Multiple source directories can passed, such as:
+```shell
+pmd check -R ruleset.xml src/main/java src/test/java
+```
+
+And the exact same applies to CPD:
+```shell
+pmd cpd --minimum-tokens 100 src/main/java
+```
+
+Additionally, the CLI for the `check` command has been enhanced with a progress bar, which interactively displays the
 current progress of the analysis.
 
 TODO screenshot (take it right before releasing, because other changes to the CLI will occur until then)
 
 This can be disabled with the `--no-progress` flag.
+
+
+Finally, we now provide a completion script for Bash/Zsh to further help daily usage.
+This script can be found under `shell/pmd-completion.sh` in the binary distribution.
+To use it, edit your `~/.bashrc` / `~/.zshrc` file and add the following line:
+
+```
+source *path_to_pmd*/shell/pmd-completion.sh
+```
 
 #### Full Antlr support
 
@@ -132,6 +188,9 @@ conversions that may be made implicit.
 * {% rule "java/design/UseUtilityClass" %}: The property `ignoredAnnotations` has been removed.
 * {% rule "java/design/LawOfDemeter" %}: the rule has a new property `trustRadius`. This defines the maximum degree
   of trusted data. The default of 1 is the most restrictive.
+* {% rule "java/documentation/CommentContent" %}: The properties `caseSensitive` and `disallowedTerms` are removed. The
+  new property `fobiddenRegex` can be used now to define the disallowed terms with a single regular
+  expression.
 
 #### Deprecated Rules
 
@@ -183,15 +242,26 @@ The following previously deprecated rules have been finally removed:
 
 * miscellaneous
     *   [#896](https://github.com/pmd/pmd/issues/896): \[all] Use slf4j
+    *   [#3797](https://github.com/pmd/pmd/issues/3797): \[all] Use JUnit5
     *   [#1451](https://github.com/pmd/pmd/issues/1451): \[core] RulesetFactoryCompatibility stores the whole ruleset file in memory as a string
 * ant
     * [#4080](https://github.com/pmd/pmd/issues/4080): \[ant] Split off Ant integration into a new submodule 
 * core
+    * [#2234](https://github.com/pmd/pmd/issues/2234): \[core] Consolidate PMD CLI into a single command
+    * [#2518](https://github.com/pmd/pmd/issues/2518): \[core] Language properties
+    * [#2873](https://github.com/pmd/pmd/issues/2873): \[core] Utility classes in pmd 7
+    * [#3203](https://github.com/pmd/pmd/issues/3203): \[core] Replace RuleViolationFactory implementations with ViolationDecorator
+    * [#3782](https://github.com/pmd/pmd/issues/3782): \[core] Language lifecycle
+    * [#3902](https://github.com/pmd/pmd/issues/3902): \[core] Violation decorators
     * [#4035](https://github.com/pmd/pmd/issues/4035): \[core] ConcurrentModificationException in DefaultRuleViolationFactory
 * cli
     *   [#3828](https://github.com/pmd/pmd/issues/3828): \[core] Progress reporting
+    *   [#4079](https://github.com/pmd/pmd/issues/4079): \[cli] Split off CLI implementation into a pmd-cli submodule
 * apex-design
     *   [#2667](https://github.com/pmd/pmd/issues/2667): \[apex] Integrate nawforce/ApexLink to build robust Unused rule
+* java
+    * [#4317](https://github.com/pmd/pmd/issues/4317): \[java] Some AST nodes should not be TypeNodes
+    * [#4367](https://github.com/pmd/pmd/issues/4367): \[java] Move testrule TypeResTest into internal
 * java-bestpractices
     * [#342](https://github.com/pmd/pmd/issues/342): \[java] AccessorMethodGeneration: Name clash with another public field not properly handled
     * [#755](https://github.com/pmd/pmd/issues/755): \[java] AccessorClassGeneration false positive for private constructors
@@ -225,7 +295,6 @@ The following previously deprecated rules have been finally removed:
     * [#1918](https://github.com/pmd/pmd/issues/1918): \[java] UselessParentheses false positive with boolean operators
     * [#2134](https://github.com/pmd/pmd/issues/2134): \[java] PreserveStackTrace not handling `Throwable.addSuppressed(...)`
     * [#2299](https://github.com/pmd/pmd/issues/2299): \[java] UnnecessaryFullyQualifiedName false positive with similar package name
-    * [#2528](https://github.com/pmd/pmd/issues/2528): \[java] MethodNamingConventions - JUnit 5 method naming not support `@ParameterizedTest`
     * [#2391](https://github.com/pmd/pmd/issues/2391): \[java] UseDiamondOperator FP when expected type and constructed type have a different parameterization
     * [#2528](https://github.com/pmd/pmd/issues/2528): \[java] MethodNamingConventions - JUnit 5 method naming not support ParameterizedTest
     * [#2739](https://github.com/pmd/pmd/issues/2739): \[java] UselessParentheses false positive for string concatenation
@@ -252,7 +321,6 @@ The following previously deprecated rules have been finally removed:
     * [#2320](https://github.com/pmd/pmd/issues/2320): \[java] NullAssignment - FP with ternary and null as method argument
     * [#2532](https://github.com/pmd/pmd/issues/2532): \[java] AvoidDecimalLiteralsInBigDecimalConstructor can not detect the case `new BigDecimal(Expression)`
     * [#2579](https://github.com/pmd/pmd/issues/2579): \[java] MissingBreakInSwitch detects the lack of break in the last case
-    * [#2716](https://github.com/pmd/pmd/issues/2716): \[java] CompareObjectsWithEqualsRule: False positive with Enums
     * [#2880](https://github.com/pmd/pmd/issues/2880): \[java] CompareObjectsWithEquals - false negative with type res
     * [#2894](https://github.com/pmd/pmd/issues/2894): \[java] Improve MissingBreakInSwitch
     * [#3071](https://github.com/pmd/pmd/issues/3071): \[java] BrokenNullCheck FP with PMD 6.30.0
@@ -291,6 +359,19 @@ The following previously deprecated rules have been finally removed:
   has been moved into the same package {% jdoc_package ant::ant %}. You'll need to update your taskdef entries in your
   build.xml files with the FQCN {% jdoc !!ant::ant.CPDTask %} if you use it anywhere.
 
+* Utility classes in {% jdoc_package core::util %}, that have previously marked as `@InternalApi` have been finally
+  moved to {% jdoc_package core::internal.util %}. This includes ClasspathClassLoader, FileFinder, FileUtil, and
+  IOUtil.
+
+* The following utility classes in {% jdoc_package core::util %} are now considered public API:
+  * {% jdoc core::util.AssertionUtil %}
+  * {% jdoc core::util.CollectionUtil %}
+  * {% jdoc core::util.ContextedAssertionError %}
+  * {% jdoc core::util.ContextedStackOverflowError %}
+  * {% jdoc core::util.GraphUtil %}
+  * {% jdoc core::util.IteratorUtil %}
+  * {% jdoc core::util.StringUtil %}
+
 #### Metrics framework
 
 The metrics framework has been made simpler and more general.
@@ -310,6 +391,32 @@ The metrics framework has been made simpler and more general.
 * This makes it so, that {% jdoc core::lang.metrics.LanguageMetricsProvider %} does not need type parameters. It can just return a `Set<Metric<?, ?>>` to list available metrics.
 
 * {% jdoc_old core::lang.metrics.Signature %}s, their implementations, and the interface `SignedNode` have been removed. Node streams allow replacing their usages very easily.
+
+#### Testing framework
+
+* PMD 7 has been upgraded to use JUnit 5 only. That means, that JUnit4 related classes have been removed, namely
+  * `net.sourceforge.pmd.testframework.PMDTestRunner`
+  * `net.sourceforge.pmd.testframework.RuleTestRunner`
+  * `net.sourceforge.pmd.testframework.TestDescriptor`
+* Rule tests, that use {% jdoc test::testframework.SimpleAggregatorTst %} or {% jdoc test::testframework.PmdRuleTst %} work as before without change, but use
+  now JUnit5 under the hood. If you added additional JUnit4 tests to your rule test classes, then you'll need to upgrade them to use JUnit5.
+
+#### Language Modules
+
+In order to support language properties and provide a proper lifecycle for languages, there were some changes needed
+in this area:
+
+* The class `BaseLanguageModule` has been removed.
+* Individual language modules should now extend {% jdoc core::lang.impl.SimpleLanguageModuleBase %}. Like before
+  this class is registered via the service loader mechanism via `META-INF/services/net.sourceforge.pmd.lang.Language`.
+* The implementation of a language version handler has been simplified by providing default implementations for
+  most aspects. The minimum requirement is now to provide an own parser for the language version handler.
+* Language modules can define [custom language properties](pmd_languages_configuration.html)
+  which can be set via environment variables. This allows
+  to add and use language specific configuration options without the need to change pmd-core.
+* For each PMD analysis run a new `LanguageProcessor` instance is created and destroyed afterwards.  This allows
+  to store global information without using static fields. This enables the implementation of multifile analysis.
+* Rules have access to this language processor instance during initialization.
 
 ### External Contributions
 
